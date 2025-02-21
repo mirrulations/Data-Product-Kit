@@ -1,10 +1,13 @@
 echo ---SQL---
 echo Creating Tables...
 python3 sql/CreateTables.py
+echo
 echo Ingesting docket DOS-2022-0004...
 python3 sql/IngestFromS3.py DOS-2022-0004
 
+echo 
 echo ---OpenSearch---
 echo Creating Index...
+echo
 echo Ingesting docket DOS-2022-0004...
 python3 opensearch/ingest.py
