@@ -1,0 +1,1 @@
+aws s3 ls --no-sign-request s3://mirrulations/raw-data/    >> agency.txt

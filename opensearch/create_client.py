@@ -4,25 +4,23 @@ import certifi
 import boto3
 from opensearchpy import OpenSearch, RequestsHttpConnection, AWSV4SignerAuth
 
-'''
-This function creates an OpenSearch client. If the environment variables OPENSEARCH_HOST if OPENSEARCH_PORT are not
-set, an error is raised. If the host is set to 'localhost', the client is created with basic authentication. Otherwise,
-the client is created with AWS request signing. The function returns the OpenSearch client.
-
-All code that depends on whether we are connecting to a local or production OpenSearch instance is inside of this function.
-Outside of the function, interaction with the client is the same regardless of the environment.
-'''
 def create_client():
+    '''
+    This function creates an OpenSearch client. If the environment variables OPENSEARCH_HOST and OPENSEARCH_PORT are not
+    set, an error is raised. If ENVIRONMENT is set to 'local', it connects using basic auth. Otherwise,
+    it uses AWS request signing. This abstracts away local vs cloud setup.
+    @return: OpenSearch client
+    '''
     load_dotenv()
 
     host = os.getenv('OPENSEARCH_HOST')
     port = os.getenv('OPENSEARCH_PORT')
     region = 'us-east-1'
-
-    if host is None or port is None:
+    # Makes sure your environment variables are set
+    if not host or not port:
         raise ValueError('Please set the environment variables OPENSEARCH_HOST and OPENSEARCH_PORT')
-    
-    if host == 'localhost':
+    # If the environment is local, we use basic auth and returns the client immediately
+    if env == "local":
         auth = ('admin', os.getenv('OPENSEARCH_INITIAL_ADMIN_PASSWORD'))
 
         ca_certs_path = certifi.where()
@@ -43,9 +41,7 @@ def create_client():
     service = 'aoss'
     credentials = boto3.Session().get_credentials()
     auth = AWSV4SignerAuth(credentials, region, service)
-
-
-    # Create the client using AWS request signing
+    # creates the opensearch aws client (for production)
     client = OpenSearch(
         hosts=[{'host': host, 'port': port}],
         http_compress = True, # enables gzip compression for request bodies
