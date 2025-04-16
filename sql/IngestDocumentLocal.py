@@ -1,0 +1,121 @@
+from utilities.ingest_comment import insert_comment
+from utilities.ingest_docket import insert_docket
+from utilities.ingest_document import insert_document
+import sys
+import os
+import psycopg
+from dotenv import load_dotenv
+
+
+def get_agency(docket_id: str) -> str:
+    return docket_id.split("-")[0]
+
+
+def get_text_content_from_s3(file_path: str):
+    try:
+        with open(file_path, "r") as file:
+            text = file.read().rstrip()
+
+            return text
+    except Exception as e:
+        print(f"Error retrieving JSON file {file_path}, {e}")
+        return None
+
+
+def process_comments(conn, s3_path):
+    text = get_text_content_from_s3(s3_path)
+    insert_comment(conn, text)
+
+
+def process_dockets(conn, s3_path):
+    text = get_text_content_from_s3(s3_path)
+    insert_docket(conn, text)
+
+
+def process_documents(conn, s3_path):
+    print(f"processing {s3_path}")
+    text = get_text_content_from_s3(s3_path)
+    insert_document(conn, text)
+
+
+def sort_files(files_list) -> list[str]:
+    # Define the order of categories
+    category_order = {"docket": 1, "documents": 2, "comments": 3}
+
+    # Function to determine the sorting key
+    def sorting_key(file_path):
+        # Check which category the file belongs to
+        for category in category_order.keys():
+            if category in file_path:
+                return category_order[category]
+        return float("inf")  # If no category is found, place it at the end
+
+    # Sort the files based on the defined order
+    sorted_files = sorted(files_list, key=sorting_key)
+
+    return sorted_files
+
+
+def categorize_and_process_files(conn, file_list):
+    # exclude_keywords = [
+    #     "binary",
+    #     "comments_extracted_text",
+    #     "(1)",
+    #     ".htm",
+    #     ".DS_Store"
+    # ]  # (1) should be investgated
+    for file_path in file_list:
+        #     if all(keyword not in file_path for keyword in exclude_keywords):
+        #         if "comments" in file_path:
+        #             process_comments(conn, file_path)
+        #         elif "docket" in file_path:
+        #             process_dockets(conn, file_path)
+        #         elif "documents" in file_path:
+        process_documents(conn, file_path)
+        # else:
+        #     print(f"Unknown category for file: {file_path}")
+
+
+def get_s3_files(bucket, docket_id: str):
+    agency = get_agency(docket_id)
+    files = bucket.objects.filter(
+        Prefix=f"{agency}/{docket_id}",
+    )
+    return [file.key for file in files if file.key.endswith(".json")]
+
+
+def main():
+    # Get docket_id from command line arguments
+    if len(sys.argv) < 2:
+        print("Usage: python IngestLocal.py <folder-containing-docket>")
+        sys.exit(1)
+
+    path = sys.argv[1]  # Get docket_id from command line
+    files = [
+        os.path.join(dirpath, f)
+        for (dirpath, dirnames, filenames) in os.walk(path)
+        for f in filenames
+        if "document" in dirpath and "(1)" not in f and f.endswith(".json")
+    ]
+
+    load_dotenv()
+    dbname = os.getenv("POSTGRES_DB")
+    username = os.getenv("POSTGRES_USER")
+    password = os.getenv("POSTGRES_PASSWORD")
+    host = os.getenv("POSTGRES_HOST")
+    port = os.getenv("POSTGRES_PORT")
+
+    conn_params = {
+        "dbname": dbname,
+        "user": username,
+        "password": password,
+        "host": host,
+        "port": port,
+    }
+    print(files)
+    with psycopg.connect(**conn_params) as conn:
+        categorize_and_process_files(conn, files)
+
+
+if __name__ == "__main__":
+    main()
