@@ -1,0 +1,5 @@
+# Comment Count Discrepancy
+
+As of 4/21/25, [regulations.gov](https://www.regulations.gov) reports that there are a total of 23,189,282 posted comments. In mirrulations, the number of comment json files was 22,703,143. This number was calculated via an directory walk of a copy of mirrulations on disk that was made a few days before 4/21. Note that file names including (1)(2)... were not included because they refer to the same comment. 
+
+It is unlikely that the difference of ~500,000 comments were all posted in the time period between the sync and when the number from [regulations.gov](https://www.regulations.gov) was found. So, there must be some other reason for this discrepancy, but we are unsure what it is exactly. It is possible that there are very large comments and the API times out when trying to fetch them. This discrepancy should be investigated further.
