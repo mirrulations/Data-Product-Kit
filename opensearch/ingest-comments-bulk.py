@@ -8,19 +8,11 @@ import time
 def get_data_from_file(file_path):
     with open(file_path) as file:
         try:
-            file_text = file.read()
-            method = file_path.split('/')[-2]
-            base_name = os.path.basename(file_path)
-            comment_id, remainder = base_name.split("_attachment_")
-            attachment_id = remainder.split("_extracted")[0]
-            attachment_id = comment_id + "-" + attachment_id
-            docket_id = "-".join(comment_id.split("-")[:-1])
+            data = json.load(file)
             document = {
-                'extractedText': file_text,
-                'extractedMethod': method,
-                'docketId': docket_id,
-                'commentId': comment_id,
-                'attachmentId': attachment_id,
+                'commentText': data['data']['attributes']['comment'],
+                'docketId': data['data']['attributes']['docketId'],
+                'commentId': data['data']['id']
             }
             return document
         except Exception as e:
@@ -40,14 +32,14 @@ def  bulk_ingest_all(client, directory_name, index_name, max_mb_per_bulk):
 
     for dirpath, dirnames, filenames in os.walk(directory_name):
         for filename in filenames:
-            if "comments_extracted_text" in dirpath and filename.endswith(".txt"):
+            if dirpath.endswith("comments") and filename.endswith(".json"):
                 document = get_data_from_file(os.path.join(dirpath, filename))
                 if not document:
                     continue
-                attachment_id = document['attachmentId']
+                comment_id = document['commentId']
             
                 # the action line is used to specify the index name
-                action = f'{{"index": {{"_index": "{index_name}", "_id": "{attachment_id}"}}}}\n'
+                action = f'{{"index": {{"_index": "{index_name}", "_id": "{comment_id}"}}}}\n'
                 # the data_string is the document to be ingested
                 data_string = json.dumps(document) + '\n'
 
@@ -65,7 +57,7 @@ def  bulk_ingest_all(client, directory_name, index_name, max_mb_per_bulk):
                 
                 # if the current action line + the length of the data_string is greater than 50MB, we print the commentID and continue
                 if len(action) + len(data_string) > max_mb_per_bulk * 1024 * 1024:
-                    print(f"AttachmentID: {attachment_id} is too large to ingest")
+                    print(f"CommentID: {comment_id} is too large to ingest")
                     continue
 
                 # add the length of the action line + the length of the data_string to the current_chars
@@ -90,7 +82,7 @@ def  bulk_ingest_all(client, directory_name, index_name, max_mb_per_bulk):
 if __name__ == '__main__':
     client = create_client()
 
-    index_name = 'comments_extracted_text'
+    index_name = 'comments'
 
     # specify the directory name where the JSON files are stored
     
